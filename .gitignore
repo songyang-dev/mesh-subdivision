@@ -1,0 +1,8 @@
+# ide
+.vscode/
+
+# builds
+*build/
+
+# output
+output/
