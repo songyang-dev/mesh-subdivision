@@ -25,6 +25,8 @@ set(
         trimesh_types.h
         argparse.h
         argparse.cpp
+        subdivision.h
+        subdivision.cpp
 )
 
 # C++ standards

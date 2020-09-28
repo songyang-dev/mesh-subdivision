@@ -3,6 +3,7 @@
 #include "trimesh.h"
 #include "argparse.h"
 
+#include "subdivision.h"
 #include "main.h"
 
 int main(int argc, char *argv[])
@@ -11,56 +12,77 @@ int main(int argc, char *argv[])
     Operation op = parse(argc, argv);
 
     // create a mesh from a file in op.meshName
-    trimesh::trimesh_t mesh;
-    Eigen::MatrixXd initialVertices;
-    Eigen::MatrixXi initialFaces;
-    readMesh(mesh, op.meshName, initialVertices, initialFaces);
+    trimesh::trimesh_t mesh(op.meshName);
+    //readMesh(mesh, op.meshName);
 
     // process the mesh
-    int vertexCount = initialVertices.rows();
-    int faceCount = initialFaces.rows();
+    int vertexCount = mesh.Vertices.rows();
+    int faceCount = mesh.Faces.rows();
     processMesh(mesh, vertexCount, faceCount, op);
-    
+
     // output the mesh
     auto newFaces = mesh.get_faces();
-    igl::writeOBJ(op.output, initialVertices, newFaces);
+    igl::writeOBJ(op.output, mesh.Vertices, newFaces);
 
     // Plot the mesh
-    displayMesh(initialVertices, newFaces);
+    displayMesh(mesh.Vertices, newFaces);
 }
 
 /**
  * Reads a mesh from path and stores it in the given parameters
  */
-void readMesh(trimesh::trimesh_t &mesh, std::string &path,
-              Eigen::MatrixXd &vertices, Eigen::MatrixXi &faces)
+/*
+void readMesh(trimesh::trimesh_t &mesh, std::string &path)
 {
-    igl::read_triangle_mesh(path, vertices, faces);
+    igl::read_triangle_mesh(path, *mesh.Vertices, *mesh.Faces);
+
+    auto vertices = mesh.Vertices;
+    auto faces = mesh.Faces;
 
     // half-edges example
     std::vector<trimesh::triangle_t> triangles;
 
-    int vertexCount = vertices.rows();
-    int kNumFaces = faces.rows();
+    int vertexCount = vertices->rows();
+    int kNumFaces = faces->rows();
     triangles.resize(kNumFaces);
     for (int i = 0; i < kNumFaces; ++i)
     {
-        triangles[i].v[0] = faces(i, 0);
-        triangles[i].v[1] = faces(i, 1);
-        triangles[i].v[2] = faces(i, 2);
+        triangles[i].v[0] = (*faces)(i, 0);
+        triangles[i].v[1] = (*faces)(i, 1);
+        triangles[i].v[2] = (*faces)(i, 2);
     }
 
-    std::vector<trimesh::edge_t> edges;
-    trimesh::unordered_edges_from_triangles(triangles.size(), &triangles[0], edges);
+    trimesh::unordered_edges_from_triangles(triangles.size(), &triangles[0], *mesh.Edges);
 
-    mesh.build(vertexCount, triangles.size(), &triangles[0], edges.size(), &edges[0]);
+    mesh.build(vertexCount, triangles.size(), &triangles[0], mesh.Edges->size(), &(*mesh.Edges)[0]);
 }
+*/
 
 /**
  * Processes the mesh according to the operations specified in the command line 
  */
-void processMesh(trimesh::trimesh_t &mesh, const int vertexCount, const int faceCount, Operation op)
+void processMesh(trimesh::trimesh_t &mesh, const int vertexCount, const int faceCount,
+                 Operation op)
 {
+    switch (op.scheme)
+    {
+    case Loop:
+        LoopSubdivision(mesh);
+        break;
+
+    case Butterfly:
+        ButterflySubdivision(mesh);
+        break;
+
+    case Sqrt3:
+        std::cerr << "Sqrt3 not implemented" << std::endl;
+        exit(EXIT_FAILURE);
+        break;
+
+    default:
+        std::cerr << "Unknown scheme: " << op.scheme << std::endl;
+        exit(EXIT_FAILURE);
+    }
     // neighbor loop demonstration
     // std::vector<trimesh::index_t> neighs;
     // for (int vi = 0; vi < vertexCount; ++vi)
@@ -79,7 +101,7 @@ void processMesh(trimesh::trimesh_t &mesh, const int vertexCount, const int face
 /**
  * Shows the mesh on a libigl window, which offers interactive viewing
 */
-void displayMesh(Eigen::MatrixXd& vertices, Eigen::MatrixXi& faces)
+void displayMesh(Eigen::MatrixXd &vertices, Eigen::MatrixXi &faces)
 {
     igl::opengl::glfw::Viewer viewer;
     viewer.data().set_mesh(vertices, faces);
