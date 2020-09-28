@@ -1,4 +1,11 @@
 cmake_minimum_required(VERSION 3.1)
+
+# Windows cmake options for vcpkg
+if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+  set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+      CACHE STRING "")
+endif()
+
 project(subdivide)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
@@ -11,6 +18,7 @@ find_package(LIBIGL REQUIRED QUIET)
 
 set(
         main_src
+        main.h
         main.cpp
         trimesh.h
         trimesh.cpp

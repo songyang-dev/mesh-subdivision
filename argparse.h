@@ -9,6 +9,7 @@ struct Operation {
     Scheme scheme;
     unsigned int iterations;
     std::string meshName;
+    std::string output;
 };
 
 Operation parse(int argc, char *argv[]);

@@ -3,71 +3,97 @@
 #include "trimesh.h"
 #include "argparse.h"
 
+#include "main.h"
+
 int main(int argc, char *argv[])
 {
-    parse(argc, argv);
-    return 0;
-}
+    // get information on what to do
+    Operation op = parse(argc, argv);
 
-/*
-int main(int argc, char *argv[])
-{
-    Eigen::MatrixXd V;
-    Eigen::MatrixXi F;
-    igl::read_triangle_mesh("../../input/cube.obj", V,F);
-
-    // half-edges example
-    std::vector< trimesh::triangle_t > triangles;
-
-    int kNumVertices = V.rows();
-    int kNumFaces = F.rows();
-    triangles.resize( kNumFaces );
-    for (int i=0; i<kNumFaces; ++i){
-        triangles[i].v[0] = F(i,0);
-        triangles[i].v[1] = F(i,1);
-        triangles[i].v[2] = F(i,2);
-    }
-
-    std::vector< trimesh::edge_t > edges;
-    trimesh::unordered_edges_from_triangles( triangles.size(), &triangles[0], edges );
-
+    // create a mesh from a file in op.meshName
     trimesh::trimesh_t mesh;
-    mesh.build( kNumVertices, triangles.size(), &triangles[0], edges.size(), &edges[0] );
+    Eigen::MatrixXd initialVertices;
+    Eigen::MatrixXi initialFaces;
+    readMesh(mesh, op.meshName, initialVertices, initialFaces);
 
-    std::vector< trimesh::index_t > neighs;
-    for( int vi = 0; vi < kNumVertices; ++vi )
-    {
-        mesh.vertex_vertex_neighbors( vi, neighs );
-
-        std::cout << "neighbors of vertex " << vi << ": ";
-        for( int i = 0; i < neighs.size(); ++i )
-        {
-            std::cout << ' ' << neighs.at(i);
-        }
-        std::cout << '\n';
-    }
-    std::vector< int > a = mesh.get_face_from_he_index(0);
-    std::cout << a[0] << a[1] << a[2] << std::endl;
-    Eigen::MatrixXi newF;
-    newF = mesh.get_faces();
-    std::cout<< "\n" << newF << "\n";
+    // process the mesh
+    int vertexCount = initialVertices.rows();
+    int faceCount = initialFaces.rows();
+    processMesh(mesh, vertexCount, faceCount, op);
+    
     // output the mesh
-    igl::writeOBJ("../output/cube.obj", V, F);
+    auto newFaces = mesh.get_faces();
+    igl::writeOBJ(op.output, initialVertices, newFaces);
 
     // Plot the mesh
+    displayMesh(initialVertices, newFaces);
+}
+
+/**
+ * Reads a mesh from path and stores it in the given parameters
+ */
+void readMesh(trimesh::trimesh_t &mesh, std::string &path,
+              Eigen::MatrixXd &vertices, Eigen::MatrixXi &faces)
+{
+    igl::read_triangle_mesh(path, vertices, faces);
+
+    // half-edges example
+    std::vector<trimesh::triangle_t> triangles;
+
+    int vertexCount = vertices.rows();
+    int kNumFaces = faces.rows();
+    triangles.resize(kNumFaces);
+    for (int i = 0; i < kNumFaces; ++i)
+    {
+        triangles[i].v[0] = faces(i, 0);
+        triangles[i].v[1] = faces(i, 1);
+        triangles[i].v[2] = faces(i, 2);
+    }
+
+    std::vector<trimesh::edge_t> edges;
+    trimesh::unordered_edges_from_triangles(triangles.size(), &triangles[0], edges);
+
+    mesh.build(vertexCount, triangles.size(), &triangles[0], edges.size(), &edges[0]);
+}
+
+/**
+ * Processes the mesh according to the operations specified in the command line 
+ */
+void processMesh(trimesh::trimesh_t &mesh, const int vertexCount, const int faceCount, Operation op)
+{
+    // neighbor loop demonstration
+    // std::vector<trimesh::index_t> neighs;
+    // for (int vi = 0; vi < vertexCount; ++vi)
+    // {
+    //     mesh.vertex_vertex_neighbors(vi, neighs);
+
+    //     std::cout << "neighbors of vertex " << vi << ": ";
+    //     for (int i = 0; i < neighs.size(); ++i)
+    //     {
+    //         std::cout << ' ' << neighs.at(i);
+    //     }
+    //     std::cout << '\n';
+    // }
+}
+
+/**
+ * Shows the mesh on a libigl window, which offers interactive viewing
+*/
+void displayMesh(Eigen::MatrixXd& vertices, Eigen::MatrixXi& faces)
+{
     igl::opengl::glfw::Viewer viewer;
-    viewer.data().set_mesh(V, newF);
+    viewer.data().set_mesh(vertices, faces);
     viewer.data().set_face_based(true);
-    const Eigen::RowVector3d red = Eigen::RowVector3d(1,0,0);
+    const Eigen::RowVector3d red = Eigen::RowVector3d(1, 0, 0);
     // add vertices highlights
     viewer.data().point_size = 20;
-    viewer.data().add_points(V, red);
+    viewer.data().add_points(vertices, red);
     // add vertices index
-    for (int i=0; i<V.rows(); ++i){
-        viewer.data().add_label(V.row(i)+Eigen::RowVector3d(0.005, 0.005, 0),std::to_string(i));
+    for (int i = 0; i < vertices.rows(); ++i)
+    {
+        viewer.data().add_label(vertices.row(i) + Eigen::RowVector3d(0.005, 0.005, 0), std::to_string(i));
     }
     viewer.data().show_custom_labels = true;
     // launch viewer
     viewer.launch();
 }
-*/
