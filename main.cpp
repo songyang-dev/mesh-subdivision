@@ -1,7 +1,15 @@
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/read_triangle_mesh.h>
 #include "trimesh.h"
+#include "argparse.h"
 
+int main(int argc, char *argv[])
+{
+    parse(argc, argv);
+    return 0;
+}
+
+/*
 int main(int argc, char *argv[])
 {
     Eigen::MatrixXd V;
@@ -62,3 +70,4 @@ int main(int argc, char *argv[])
     // launch viewer
     viewer.launch();
 }
+*/
