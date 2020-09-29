@@ -13,65 +13,30 @@ int main(int argc, char *argv[])
 
     // create a mesh from a file in op.meshName
     trimesh::trimesh_t mesh(op.meshName);
-    //readMesh(mesh, op.meshName);
 
     // process the mesh
-    int vertexCount = mesh.Vertices.rows();
-    int faceCount = mesh.Faces.rows();
-    processMesh(mesh, vertexCount, faceCount, op);
+    processMesh(mesh, op);
 
     // output the mesh
-    auto newFaces = mesh.get_faces();
-    igl::writeOBJ(op.output, mesh.Vertices, newFaces);
+    igl::writeOBJ(op.output, mesh.Vertices, mesh.Faces);
 
     // Plot the mesh
-    displayMesh(mesh.Vertices, newFaces);
+    displayMesh(mesh.Vertices, mesh.Faces);
 }
-
-/**
- * Reads a mesh from path and stores it in the given parameters
- */
-/*
-void readMesh(trimesh::trimesh_t &mesh, std::string &path)
-{
-    igl::read_triangle_mesh(path, *mesh.Vertices, *mesh.Faces);
-
-    auto vertices = mesh.Vertices;
-    auto faces = mesh.Faces;
-
-    // half-edges example
-    std::vector<trimesh::triangle_t> triangles;
-
-    int vertexCount = vertices->rows();
-    int kNumFaces = faces->rows();
-    triangles.resize(kNumFaces);
-    for (int i = 0; i < kNumFaces; ++i)
-    {
-        triangles[i].v[0] = (*faces)(i, 0);
-        triangles[i].v[1] = (*faces)(i, 1);
-        triangles[i].v[2] = (*faces)(i, 2);
-    }
-
-    trimesh::unordered_edges_from_triangles(triangles.size(), &triangles[0], *mesh.Edges);
-
-    mesh.build(vertexCount, triangles.size(), &triangles[0], mesh.Edges->size(), &(*mesh.Edges)[0]);
-}
-*/
 
 /**
  * Processes the mesh according to the operations specified in the command line 
  */
-void processMesh(trimesh::trimesh_t &mesh, const int vertexCount, const int faceCount,
-                 Operation op)
+void processMesh(trimesh::trimesh_t &mesh, Operation op)
 {
     switch (op.scheme)
     {
     case Loop:
-        LoopSubdivision(mesh);
+        loopSubdivision(mesh);
         break;
 
     case Butterfly:
-        ButterflySubdivision(mesh);
+        butterflySubdivision(mesh);
         break;
 
     case Sqrt3:
@@ -83,19 +48,6 @@ void processMesh(trimesh::trimesh_t &mesh, const int vertexCount, const int face
         std::cerr << "Unknown scheme: " << op.scheme << std::endl;
         exit(EXIT_FAILURE);
     }
-    // neighbor loop demonstration
-    // std::vector<trimesh::index_t> neighs;
-    // for (int vi = 0; vi < vertexCount; ++vi)
-    // {
-    //     mesh.vertex_vertex_neighbors(vi, neighs);
-
-    //     std::cout << "neighbors of vertex " << vi << ": ";
-    //     for (int i = 0; i < neighs.size(); ++i)
-    //     {
-    //         std::cout << ' ' << neighs.at(i);
-    //     }
-    //     std::cout << '\n';
-    // }
 }
 
 /**

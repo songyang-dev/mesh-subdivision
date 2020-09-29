@@ -3,15 +3,19 @@
 
 namespace trimesh
 {
+    // All mesh components are referenced by index
     typedef long index_t;
     
+    // Holds the two indices of its vertex
     struct edge_t
     {
         index_t v[2];
         
+        // Get the index of the start vertex
         index_t& start() { return v[0]; }
         const index_t& start() const { return v[0]; }
         
+        // Get the index of the end vertex
         index_t& end() { return v[1]; }
         const index_t& end() const { return v[1]; }
         
