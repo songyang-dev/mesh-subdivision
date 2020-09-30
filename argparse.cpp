@@ -14,14 +14,14 @@ void onlyOneSchemeWarning();
 Operation parse(int argc, char *argv[])
 {
     Operation operation;
-    operation.iterations = 1;
+    operation.iterations = 0;
     operation.output = "output.obj";
 
     // Argument Help
     if (argc == 1)
     {
         std::cerr << "Usage: ./subdivide.exe file (--loop | --butterfly | --sqrt3) [-n iterations] [-o output]" << std::endl;
-        std::cerr << "If no iterations are given, default is 1." << std::endl;
+        std::cerr << "If no iterations are given, default is 0." << std::endl;
         std::cerr << "Default output is \"output.obj\" the current directory." << std::endl;
         exit(EXIT_FAILURE);
     }
@@ -104,9 +104,9 @@ Operation parse(int argc, char *argv[])
                 std::cerr << "Received iteration count is overflowing the integer capacity" << std::endl;
             }
             
-            if (n <= 0)
+            if (n < 0)
             {
-                std::cerr << "Iteration count n must be a nonzero positive integer, without overflowing" << std::endl;
+                std::cerr << "Iteration count n must be a positive integer, without overflowing" << std::endl;
                 exit(EXIT_FAILURE);
             }
             else

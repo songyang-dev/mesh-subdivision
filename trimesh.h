@@ -26,6 +26,8 @@ namespace trimesh
         Eigen::MatrixXi Faces;
         std::vector<trimesh::edge_t> Edges;
 
+        void prepare_halfedge();
+
         /**
          * Generates a triangular mesh from the given path to a triangular .obj
         */
@@ -93,6 +95,8 @@ namespace trimesh
             {
             }
         };
+
+        halfedge_t& createHalfEdge(index_t start, index_t end);
 
         // Builds the half-edge data structures from the given triangles and edges.
         // NOTE: 'edges' can be derived from 'triangles' by calling

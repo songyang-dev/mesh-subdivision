@@ -75,12 +75,24 @@ void butterflySubdivision(trimesh::trimesh_t &mesh)
         for (auto k : {0, 1, 2, 3})
             dividedFaces.row(4*i + k) = smallerFaces[k];
     }
-    
+    assert(dividedFaces.rows() == 4 * mesh.Faces.rows());
+
     // reassign the faces
     mesh.Faces = dividedFaces;
 
     // rebuild the half edge data structure
     mesh.rebuild();
+
+    // debug
+    // for (int i = 0; i < mesh.Vertices.rows(); i++)
+    // {
+    //     std::cout << "Neigbors of " << i << " : ";
+    //     for (auto j : mesh.vertex_vertex_neighbors(i)) std::cout << j << " ";
+    //     std::cout << std::endl;
+    // }
+    // std::cout << "Rows : " << mesh.Vertices.rows() << std::endl;
+    // std::cout << "Faces : " << mesh.Faces.rows() << std::endl;
+    // std::cout << mesh.Faces << std::endl;
 }
 
 /**
@@ -114,11 +126,12 @@ std::vector<Eigen::Vector3i> facesButterfly(const trimesh::trimesh_t& mesh,
         ));
 
         // Make a new face
-        smallerFaces.push_back(Eigen::Vector3i(existingVertex, mid1, mid2));
+        smallerFaces.push_back(Eigen::Vector3i(mid1, existingVertex, mid2));
 
         // leap to the next vertex
         iterating = mesh.halfedge(iterating).next_he;
     } while (iterating != halfedge);
+    assert(smallerFaces.size() == 3);
 
     // 2
     // Create the last face, with only the midpoints
