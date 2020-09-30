@@ -18,27 +18,130 @@ void loopSubdivision(trimesh::trimesh_t &mesh)
 */
 void butterflySubdivision(trimesh::trimesh_t &mesh)
 {
-    // array of (edge index, midpoint 3d position)
-    std::vector<std::pair<edge_t, Eigen::Vector3d>> edge2Midpoints;
+    // map of (edge, midpoint 3d position)
+    std::vector<Eigen::Vector3d> midpoints;
+
+    // map from edge to vertex
+    EdgeToVertex edge2Midpoints;
 
     // for every edge create a new vertex
-    for (int i = 0; i < mesh.Edges.size(); i++)
+    for (size_t i = 0; i < mesh.Edges.size(); i++)
     {
 
         // new vertex position
         Eigen::Vector3d midpoint;
 
+        // Current edge
+        auto edge = mesh.Edges[i];
+
         // get the forward half edge of the directed edge
         const trimesh_t::halfedge_t forwardHE = mesh.halfedge(
             mesh.directed_edge2he_index(
-                mesh.Edges[i].start(),
-                mesh.Edges[i].end()));
+                edge.start(),
+                edge.end()));
 
         midpoint = midpointButterfly(mesh, forwardHE);
 
-        // add midpoint to arrays
-        edge2Midpoints.push_back(std::make_pair(mesh.Edges[i], midpoint));
+        // debug
+        //std::cout << midpoint.x() << " " << midpoint.y() << " " << midpoint.z() << std::endl;
+
+        // add midpoint to array
+        midpoints.push_back(midpoint);
+        edge2Midpoints[std::make_pair(edge.start(), edge.end())] = mesh.Vertices.rows() + i;
     }
+
+    // add new vertices and new faces to the mesh
+    // 1. Add new vertices at the end of the matrix
+    // 2. For every old face, make 4 new faces in a new matrix
+    // 3. Reassign the mesh's face matrix to the new one
+    
+    // add new vertices
+    auto previousSize = mesh.Vertices.rows();
+    mesh.Vertices.conservativeResize(mesh.Vertices.rows() + midpoints.size(), Eigen::NoChange);
+    auto i = previousSize;
+    for (const auto& point : midpoints)
+    {
+        mesh.Vertices.row(i) = point;
+        i++;
+    }
+    assert(mesh.Vertices.rows() == previousSize + midpoints.size());
+
+    // recreate faces
+    Eigen::MatrixXi dividedFaces(4 * mesh.Faces.rows(), mesh.Faces.cols());
+    // loop on all current faces
+    for (Eigen::Index i = 0; i < mesh.Faces.rows(); i++)
+    {
+        auto smallerFaces = facesButterfly(mesh, i, edge2Midpoints);
+        for (auto k : {0, 1, 2, 3})
+            dividedFaces.row(4*i + k) = smallerFaces[k];
+    }
+    
+    // reassign the faces
+    mesh.Faces = dividedFaces;
+
+    // rebuild the half edge data structure
+    mesh.rebuild();
+}
+
+/**
+ * Makes four smaller faces from one face, using midpoints
+*/
+std::vector<Eigen::Vector3i> facesButterfly(const trimesh::trimesh_t& mesh,
+    const index_t& face,
+    EdgeToVertex& edge2Midpoints)
+{
+    // 4 faces, each face has 3 components
+    std::vector<Eigen::Vector3i> smallerFaces;
+
+    // half edge of the larger face
+    auto halfedge = mesh.get_he_index_from_face(face);
+
+    // Procedure for making smaller faces
+    // 1. Create the small face whose vertices contain an existing vertex
+    // 2. Create the small face whose vertices are all midpoints
+
+    // 1
+    // Loop across the triangle face's existing vertices
+    auto iterating = halfedge;
+    do {
+        // existing vertex (index)
+        index_t existingVertex = mesh.halfedge(iterating).to_vertex;
+
+        // get the indices of the two midpoints around this vertex
+        index_t mid1 = vertexFromEdge(edge2Midpoints, mesh.he_index2directed_edge(iterating));
+        index_t mid2 = vertexFromEdge(edge2Midpoints, mesh.he_index2directed_edge(
+            mesh.halfedge(iterating).next_he
+        ));
+
+        // Make a new face
+        smallerFaces.push_back(Eigen::Vector3i(existingVertex, mid1, mid2));
+
+        // leap to the next vertex
+        iterating = mesh.halfedge(iterating).next_he;
+    } while (iterating != halfedge);
+
+    // 2
+    // Create the last face, with only the midpoints
+    std::vector<index_t> midpoints;
+    
+    // gather vertices for the face
+    iterating = halfedge;
+    do {
+        index_t point = vertexFromEdge(edge2Midpoints, 
+            mesh.he_index2directed_edge(iterating));
+        midpoints.push_back(point);
+        // next vertex
+        iterating = mesh.halfedge(iterating).next_he;
+    } while (iterating != halfedge);
+    assert(midpoints.size() == 3);
+
+    // make the last face
+    Eigen::Vector3i innerFace(midpoints[0], midpoints[1], midpoints[2]);
+    smallerFaces.push_back(innerFace);
+
+    assert(smallerFaces.size() == 4);
+
+    return smallerFaces;
 }
 
 /**
@@ -47,7 +150,7 @@ void butterflySubdivision(trimesh::trimesh_t &mesh)
  * 
  * Given half edge rides along the edge that we are seeking the midpoint of
 */
-Eigen::Vector3d midpointButterfly(trimesh_t &mesh, const trimesh_t::halfedge_t& halfedge)
+Eigen::Vector3d midpointButterfly(const trimesh_t &mesh, const trimesh_t::halfedge_t& halfedge)
 {
     Eigen::Vector3d mid;
 
@@ -82,10 +185,10 @@ Eigen::Vector3d midpointButterfly(trimesh_t &mesh, const trimesh_t::halfedge_t& 
         ).to_vertex
     );
     auto d6 = mesh.Vertices.row(
-        // opposite, next, opposite, next, v
+        // next, next, opposite, next, v
         mesh.halfedge(
             mesh.halfedge(mesh.halfedge(mesh.halfedge(
-                halfedge.opposite_he).next_he).opposite_he).next_he
+                halfedge.next_he).next_he).opposite_he).next_he
         ).to_vertex
     );
     auto d7 = mesh.Vertices.row(

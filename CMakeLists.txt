@@ -27,6 +27,8 @@ set(
         argparse.cpp
         subdivision.h
         subdivision.cpp
+        utils.h
+        utils.cpp
 )
 
 # C++ standards
@@ -35,3 +37,4 @@ set (CMAKE_CXX_STANDARD 17)
 # Add your project files
 add_executable(${PROJECT_NAME} ${main_src})
 target_link_libraries(${PROJECT_NAME} igl::core igl::opengl_glfw)
+

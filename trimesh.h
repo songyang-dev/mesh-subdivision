@@ -26,11 +26,26 @@ namespace trimesh
         Eigen::MatrixXi Faces;
         std::vector<trimesh::edge_t> Edges;
 
+        /**
+         * Generates a triangular mesh from the given path to a triangular .obj
+        */
         trimesh_t(std::string path)
         {
             igl::read_triangle_mesh(path, this->Vertices, this->Faces);
 
-            // half-edges example
+            // get triangles from the vertices and faces
+            std::vector<trimesh::triangle_t> triangles = get_triangles();
+
+            trimesh::unordered_edges_from_triangles(triangles.size(), &triangles[0], this->Edges);
+
+            this->build(this->Vertices.rows(), triangles.size(), &triangles[0], this->Edges.size(), &this->Edges[0]);
+        }
+
+        /**
+         * Get triangles from the mesh's vertices and faces
+        */
+        std::vector<trimesh::triangle_t> get_triangles()
+        {
             std::vector<trimesh::triangle_t> triangles;
 
             int vertexCount = this->Vertices.rows();
@@ -42,10 +57,19 @@ namespace trimesh
                 triangles[i].v[1] = this->Faces(i, 1);
                 triangles[i].v[2] = this->Faces(i, 2);
             }
+            return triangles;
+        }
+
+        /**
+         * Regerates the mesh's half edge data structure from its vertices and faces
+        */
+        void rebuild()
+        {
+            auto triangles = get_triangles();
 
             trimesh::unordered_edges_from_triangles(triangles.size(), &triangles[0], this->Edges);
 
-            this->build(vertexCount, triangles.size(), &triangles[0], this->Edges.size(), &this->Edges[0]);
+            this->build(this->Vertices.rows(), triangles.size(), &triangles[0], this->Edges.size(), &this->Edges[0]);
         }
 
         struct halfedge_t
@@ -101,6 +125,7 @@ namespace trimesh
             return std::make_pair(m_halfedges[he.opposite_he].to_vertex, he.to_vertex);
         }
 
+        // Takes in two vertices and returns a halfedge, all in indices
         index_t directed_edge2he_index(const index_t i, const index_t j) const
         {
             /*
@@ -218,6 +243,12 @@ namespace trimesh
             face[2] = m_halfedges[m_halfedges[he.next_he].next_he].to_vertex;
             return face;
         };
+
+        // Get the half edge for a given face
+        index_t get_he_index_from_face(index_t face_index) const
+        {
+            return m_face_halfedges[face_index];
+        }
 
         Eigen::MatrixXi get_faces()
         {
