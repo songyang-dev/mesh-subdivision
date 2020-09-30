@@ -2,6 +2,9 @@
 
 #include "subdivision.h"
 
+#define _USE_MATH_DEFINES
+#include <math.h>
+
 using namespace trimesh;
 
 /**
@@ -10,6 +13,130 @@ using namespace trimesh;
 */
 void loopSubdivision(trimesh::trimesh_t &mesh)
 {
+    // 1. Generate new midpoints
+    // 2. Adjust existing vertices
+    // 3. Recreate faces
+
+    // 1
+    // midpoints on edges
+    std::vector<Eigen::Vector3d> midpoints;
+
+    // map from edge to vertex, in indices
+    EdgeToVertex edge2Midpoints;
+
+    // loop on edges, generate a midpoint for each
+    for (size_t i = 0; i < mesh.Edges.size(); i++)
+    {
+        // Current edge
+        auto edge = mesh.Edges[i];
+
+        // get the forward half edge of the directed edge
+        const trimesh_t::halfedge_t forwardHE = mesh.halfedge(
+            mesh.directed_edge2he_index(
+                edge.start(),
+                edge.end()));
+
+        // new vertex position
+        Eigen::Vector3d midpoint = midpointLoop(mesh, forwardHE);
+
+        // debug
+        //std::cout << midpoint.x() << " " << midpoint.y() << " " << midpoint.z() << std::endl;
+
+        // add midpoint to array
+        midpoints.push_back(midpoint);
+        edge2Midpoints[std::make_pair(edge.start(), edge.end())] = mesh.Vertices.rows() + i;
+    }
+
+    // 2
+    // Adjusted vertices
+
+    // Loop on vertices
+    for (size_t i = 0; i < mesh.Vertices.rows(); i++)
+    {
+        mesh.Vertices.row(i) = adjustVertexLoop(mesh, i);
+    }
+
+    // Add new vertices
+    auto previousSize = mesh.Vertices.rows();
+    mesh.Vertices.conservativeResize(mesh.Vertices.rows() + midpoints.size(), Eigen::NoChange);
+    auto i = previousSize;
+    for (const auto& point : midpoints)
+    {
+        mesh.Vertices.row(i) = point;
+        i++;
+    }
+    assert(mesh.Vertices.rows() == previousSize + midpoints.size());
+    
+    // 3
+    // recreate faces, same procedure as butterfly
+    Eigen::MatrixXi dividedFaces(4 * mesh.Faces.rows(), mesh.Faces.cols());
+    // loop on all current faces
+    for (Eigen::Index i = 0; i < mesh.Faces.rows(); i++)
+    {
+        auto smallerFaces = facesButterfly(mesh, i, edge2Midpoints);
+        for (auto k : {0, 1, 2, 3})
+            dividedFaces.row(4*i + k) = smallerFaces[k];
+    }
+    assert(dividedFaces.rows() == 4 * mesh.Faces.rows());
+
+    // reassign the faces
+    mesh.Faces = dividedFaces;
+
+    // rebuild the half edge data structure
+    mesh.rebuild();
+
+}
+
+/**
+ * Adjust the position of the vertex at the given index
+ * */
+Eigen::Vector3d adjustVertexLoop(const trimesh::trimesh_t& mesh, 
+    const trimesh::index_t& vertex)
+{
+    size_t degree = mesh.vertex_valence(vertex);
+    double alpha = 3.0/8 + pow(3.0/8 + 1.0/4 * cos(2*M_PI/degree), 2);
+    
+    Eigen::Vector3d sum(0,0,0);
+    for (auto & index: mesh.vertex_vertex_neighbors(vertex))
+        sum += mesh.Vertices.row(index);
+
+    Eigen::Vector3d position = alpha * mesh.Vertices.row(vertex);
+        
+    position += (1 - alpha)/degree * sum;
+    
+    return position;
+}
+
+/**
+ * Generate an edge midpoint coordinate according to the loop scheme
+ * */
+Eigen::Vector3d midpointLoop(const trimesh::trimesh_t& mesh, 
+    const trimesh::trimesh_t::halfedge_t& halfedge)
+{
+    Eigen::Vector3d mid;
+
+    // 3/8 * (d1 + di) = 3/8 (start + end of the half edge)
+    auto end = mesh.Vertices.row(halfedge.to_vertex);
+    auto start = mesh.Vertices.row(
+        mesh.halfedge(halfedge.opposite_he).to_vertex
+    );
+    mid = 3.0/8 * (end + start);
+
+    // 1/8 * (d(i-1) + d(i+1)) = 1/8 * (average of the common neighbors)
+    auto neighbor1 = mesh.Vertices.row(
+        // next, v
+        mesh.halfedge(halfedge.next_he).to_vertex
+    );
+    auto neighbor2 = mesh.Vertices.row(
+        // opposite, next, v
+        mesh.halfedge(
+            mesh.halfedge(
+                halfedge.opposite_he).next_he
+        ).to_vertex
+    );
+    mid += 1.0/8 * (neighbor1 + neighbor2);
+
+    return mid;
 }
 
 /**
@@ -27,10 +154,6 @@ void butterflySubdivision(trimesh::trimesh_t &mesh)
     // for every edge create a new vertex
     for (size_t i = 0; i < mesh.Edges.size(); i++)
     {
-
-        // new vertex position
-        Eigen::Vector3d midpoint;
-
         // Current edge
         auto edge = mesh.Edges[i];
 
@@ -40,7 +163,8 @@ void butterflySubdivision(trimesh::trimesh_t &mesh)
                 edge.start(),
                 edge.end()));
 
-        midpoint = midpointButterfly(mesh, forwardHE);
+        // new vertex position
+        Eigen::Vector3d midpoint = midpointButterfly(mesh, forwardHE);
 
         // debug
         //std::cout << midpoint.x() << " " << midpoint.y() << " " << midpoint.z() << std::endl;

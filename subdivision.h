@@ -18,4 +18,11 @@ Eigen::Vector3d midpointButterfly(const trimesh::trimesh_t& mesh,
 std::vector<Eigen::Vector3i> facesButterfly(const trimesh::trimesh_t& mesh,
     const trimesh::index_t& face,
     EdgeToVertex& edge2Midpoints);
+
+// loop
+Eigen::Vector3d midpointLoop(const trimesh::trimesh_t& mesh, 
+    const trimesh::trimesh_t::halfedge_t& halfedge);
+Eigen::Vector3d adjustVertexLoop(const trimesh::trimesh_t& mesh, 
+    const trimesh::index_t& vertex);
+
 #endif // __subdivision_h__
